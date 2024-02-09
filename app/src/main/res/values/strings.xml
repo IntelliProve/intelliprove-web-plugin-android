@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">IntelliProve</string>
+    <string name="appTitle">IntelliProve WebView POC</string>
+    <string name="openWebView">Open WebView</string>
+</resources>
