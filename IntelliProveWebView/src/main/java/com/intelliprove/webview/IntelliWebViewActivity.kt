@@ -2,6 +2,7 @@ package com.intelliprove.webview
 
 import android.Manifest
 import android.annotation.SuppressLint
+import android.app.Activity
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -17,6 +18,7 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 
+
 interface IntelliWebViewDelegate {
     fun didReceivePostMessage(postMessage: String)
 }
@@ -28,6 +30,8 @@ private object IntelliWebViewDelegateHolder {
 class IntelliWebViewActivity : AppCompatActivity() {
     private val CAMERA_PERMISSION_REQUEST_CODE = 100
     private var pendingPermissionRequest: PermissionRequest? = null
+
+    private var webView: WebView? = null
 
     companion object {
         private const val urlStringKey = "urlStringKey"
@@ -43,10 +47,17 @@ class IntelliWebViewActivity : AppCompatActivity() {
             }
             context.startActivity(intent)
         }
+
+        fun dismiss(context: Context) {
+            val activity = context as IntelliWebViewActivity
+            activity.finish();
+        }
     }
 
     override fun onDestroy() {
         IntelliWebViewDelegateHolder.delegate = null
+        webView?.destroy()
+        webView = null;
         super.onDestroy()
     }
 
@@ -57,51 +68,57 @@ class IntelliWebViewActivity : AppCompatActivity() {
         setContentView(R.layout.activity_intelliwebview)
 
         val urlString = intent.getStringExtra(urlStringKey)
-        val webView = findViewById<WebView>(R.id.webView)
 
-        // Needed to run JavaScript and use the LocalStorage API - otherwise the web app won't work
-        webView.settings.javaScriptEnabled = true
-        webView.settings.domStorageEnabled = true
+        if (webView == null) {
+            var webView = findViewById<WebView>(R.id.webView)
+            this.webView = webView;
 
-        // Add a listener for the PostMessage API
-        webView.addJavascriptInterface(IntelliWebAppInterface(), "IntelliPostMessage")
+            // Needed to run JavaScript and use the LocalStorage API - otherwise the web app won't work
+            webView.settings.javaScriptEnabled = true
+            webView.settings.domStorageEnabled = true
 
-        // Add a listener for WebView events, so we can inject some JavaScript at load time
-        webView.webViewClient = IntelliWebViewClient()
+            // Add a listener for the PostMessage API
+            webView.addJavascriptInterface(IntelliWebAppInterface(), "IntelliPostMessage")
 
-        // Add listener for permissions, so we can dispatch the Camera Permissions check to Android
-        webView.webChromeClient = object : WebChromeClient() {
-            override fun onConsoleMessage(consoleMessage: ConsoleMessage?): Boolean {
-                consoleMessage?.let {
-                    Log.d("WebView", "${it.sourceId()}:${it.lineNumber()} - ${it.message()}")
+            // Add a listener for WebView events, so we can inject some JavaScript at load time
+            webView.webViewClient = IntelliWebViewClient()
+
+            // Add listener for permissions, so we can dispatch the Camera Permissions check to Android
+            webView.webChromeClient = object : WebChromeClient() {
+                override fun onConsoleMessage(consoleMessage: ConsoleMessage?): Boolean {
+                    consoleMessage?.let {
+                        Log.d("WebView", "${it.sourceId()}:${it.lineNumber()} - ${it.message()}")
+                    }
+                    return super.onConsoleMessage(consoleMessage)
                 }
-                return super.onConsoleMessage(consoleMessage)
-            }
 
-            override fun onPermissionRequest(request: PermissionRequest?) {
-                request?.resources?.forEach { resource ->
-                    when (resource) {
-                        PermissionRequest.RESOURCE_VIDEO_CAPTURE -> {
-                            // Check if CAMERA permission is granted
-                            if (ContextCompat.checkSelfPermission(
-                                    this@IntelliWebViewActivity,
-                                    Manifest.permission.CAMERA
-                            ) == PackageManager.PERMISSION_GRANTED) {
-                                // Permission already granted, grant the camera permission
-                                request.grant(arrayOf(PermissionRequest.RESOURCE_VIDEO_CAPTURE))
-                            } else {
-                                // Request CAMERA permission from the user
-                                pendingPermissionRequest = request
-                                ActivityCompat.requestPermissions(
-                                    this@IntelliWebViewActivity,
-                                    arrayOf(Manifest.permission.CAMERA),
-                                    CAMERA_PERMISSION_REQUEST_CODE
-                                )
+                override fun onPermissionRequest(request: PermissionRequest?) {
+                    request?.resources?.forEach { resource ->
+                        when (resource) {
+                            PermissionRequest.RESOURCE_VIDEO_CAPTURE -> {
+                                // Check if CAMERA permission is granted
+                                if (ContextCompat.checkSelfPermission(
+                                        this@IntelliWebViewActivity,
+                                        Manifest.permission.CAMERA
+                                    ) == PackageManager.PERMISSION_GRANTED
+                                ) {
+                                    // Permission already granted, grant the camera permission
+                                    request.grant(arrayOf(PermissionRequest.RESOURCE_VIDEO_CAPTURE))
+                                } else {
+                                    // Request CAMERA permission from the user
+                                    pendingPermissionRequest = request
+                                    ActivityCompat.requestPermissions(
+                                        this@IntelliWebViewActivity,
+                                        arrayOf(Manifest.permission.CAMERA),
+                                        CAMERA_PERMISSION_REQUEST_CODE
+                                    )
+                                }
                             }
-                        }
-                        else -> {
-                            // Default handling: grant permissions for other resource requests
-                            request.grant(arrayOf(resource))
+
+                            else -> {
+                                // Default handling: grant permissions for other resource requests
+                                request.grant(arrayOf(resource))
+                            }
                         }
                     }
                 }
@@ -109,7 +126,7 @@ class IntelliWebViewActivity : AppCompatActivity() {
         }
 
         // Load URL in WebView
-        urlString?.let { webView.loadUrl(it) }
+        urlString?.let { webView!!.loadUrl(it) }
     }
 
     // When we need to ask permission for camera usage, we need to eventually patch its result through to the web app
