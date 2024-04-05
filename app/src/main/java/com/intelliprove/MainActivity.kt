@@ -2,12 +2,14 @@ package com.intelliprove
 
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
+import android.util.JsonReader
 import android.util.Log
 import android.widget.Button
 import com.intelliprove.webview.IntelliWebViewActivity
 import com.intelliprove.webview.IntelliWebViewDelegate
 
 class MainActivity : AppCompatActivity(), IntelliWebViewDelegate {
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
@@ -19,14 +21,21 @@ class MainActivity : AppCompatActivity(), IntelliWebViewDelegate {
     }
 
     private fun openWebView() {
+        Log.d("MainActivity", "Opened web view")
         IntelliWebViewActivity.start(
             this,
-            "https://plugin-dev.intelliprove.com/?action_token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyIjp7ImVtYWlsIjoiIiwiY3VzdG9tZXIiOiJOZWJ1bGFlIHRlc3RpbmciLCJncm91cCI6ImFkbWluIiwibWF4X21lYXN1cmVtZW50X2NvdW50IjoxMDAwfSwibWV0YSI6e30sImV4cCI6MTcxNTA3NDIyMn0.kQvGQD_8wFzmLjgFMuft_i3nWjAxSKWx5oI_FBFEYXI",
+            "https://plugin-streaming-dev.intelliprove.com/?action_token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyIjp7ImVtYWlsIjoiIiwiY3VzdG9tZXIiOiJERU1PLUNVU1RPTUVSLTEiLCJncm91cCI6ImFkbWluIiwibWF4X21lYXN1cmVtZW50X2NvdW50IjotMX0sIm1ldGEiOnt9LCJleHAiOjE3MTQ5MDcyMDV9.7GRRK8zIs4Q_LJ_pDSBVljd6O4K2shfMBxZCmn4UOlM",
             this
         )
     }
 
+    private fun dismiss() {
+        IntelliWebViewActivity.dismiss(this)
+    }
+
     override fun didReceivePostMessage(postMessage: String) {
         Log.d("MainActivity", postMessage)
+        Log.d("MainActivity", "Closing web plugin")
+        dismiss()
     }
 }
