@@ -16,6 +16,8 @@ import android.webkit.WebViewClient
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import org.json.JSONObject
+import java.lang.Exception
 
 interface IntelliWebViewDelegate {
     fun didReceivePostMessage(postMessage: String)
@@ -64,7 +66,7 @@ class IntelliWebViewActivity : AppCompatActivity() {
         webView.settings.domStorageEnabled = true
 
         // Add a listener for the PostMessage API
-        webView.addJavascriptInterface(IntelliWebAppInterface(), "IntelliPostMessage")
+        webView.addJavascriptInterface(IntelliWebAppInterface(this), "IntelliPostMessage")
 
         // Add a listener for WebView events, so we can inject some JavaScript at load time
         webView.webViewClient = IntelliWebViewClient()
@@ -133,11 +135,26 @@ class IntelliWebViewActivity : AppCompatActivity() {
     }
 }
 
-private class IntelliWebAppInterface() {
+private class IntelliWebAppInterface(val webViewActivity: IntelliWebViewActivity) {
     @JavascriptInterface
     fun receivePostMessage(postMessage: String) {
         Log.d("PostMessage", postMessage)
-        IntelliWebViewDelegateHolder.delegate?.didReceivePostMessage(postMessage)
+
+        val stage = stageFromJson(postMessage)
+        if (stage == "dismiss") {
+            webViewActivity.finish()
+        } else {
+            IntelliWebViewDelegateHolder.delegate?.didReceivePostMessage(postMessage)
+        }
+    }
+
+    private fun stageFromJson(jsonString: String): String? {
+        return try {
+            val jsonObject = JSONObject(jsonString)
+            jsonObject.getString("stage")
+        } catch (e: Exception) {
+            null
+        }
     }
 }
 
