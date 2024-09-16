@@ -17,7 +17,6 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import org.json.JSONObject
-import java.lang.Exception
 
 interface IntelliWebViewDelegate {
     fun didReceivePostMessage(postMessage: String)
@@ -30,6 +29,8 @@ private object IntelliWebViewDelegateHolder {
 class IntelliWebViewActivity : AppCompatActivity() {
     private val CAMERA_PERMISSION_REQUEST_CODE = 100
     private var pendingPermissionRequest: PermissionRequest? = null
+
+    private lateinit var webView: WebView;
 
     companion object {
         private const val urlStringKey = "urlStringKey"
@@ -49,6 +50,7 @@ class IntelliWebViewActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         IntelliWebViewDelegateHolder.delegate = null
+        this.webView.destroy()
         super.onDestroy()
     }
 
@@ -59,11 +61,12 @@ class IntelliWebViewActivity : AppCompatActivity() {
         setContentView(R.layout.activity_intelliwebview)
 
         val urlString = intent.getStringExtra(urlStringKey)
-        val webView = findViewById<WebView>(R.id.webView)
+        this.webView = findViewById<WebView>(R.id.webView)
 
         // Needed to run JavaScript and use the LocalStorage API - otherwise the web app won't work
         webView.settings.javaScriptEnabled = true
         webView.settings.domStorageEnabled = true
+        WebView.setWebContentsDebuggingEnabled(true)
 
         // Add a listener for the PostMessage API
         webView.addJavascriptInterface(IntelliWebAppInterface(this), "IntelliPostMessage")
