@@ -5,14 +5,11 @@ import android.annotation.SuppressLint
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Bundle
+import android.os.Message
 import android.util.Log
-import android.webkit.ConsoleMessage
-import android.webkit.JavascriptInterface
-import android.webkit.PermissionRequest
-import android.webkit.WebChromeClient
-import android.webkit.WebView
-import android.webkit.WebViewClient
+import android.webkit.*
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
@@ -72,7 +69,38 @@ class IntelliWebViewActivity : AppCompatActivity() {
         webView.addJavascriptInterface(IntelliWebAppInterface(this), "IntelliPostMessage")
 
         // Add a listener for WebView events, so we can inject some JavaScript at load time
-        webView.webViewClient = IntelliWebViewClient()
+        webView.webViewClient = object : WebViewClient() {
+            override fun onPageFinished(view: WebView?, url: String?) {
+                super.onPageFinished(view, url)
+                Log.d("WebView", "Page finished loading: $url")
+
+                // Disable zoom
+                val disableZoomJS = """
+            var meta = document.createElement('meta');
+            meta.name = 'viewport';
+            meta.content = 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no';
+            var head = document.getElementsByTagName('head')[0];
+            head.appendChild(meta);
+        """.trimIndent()
+                view?.evaluateJavascript(disableZoomJS, null)
+
+                // Patch PostMessage API
+                val postMessageJS = """
+            window.postMessage = function(data) {
+                var jsonString = JSON.stringify(data)
+                window.IntelliPostMessage.receivePostMessage(jsonString);
+            };
+        """.trimIndent()
+                view?.evaluateJavascript(postMessageJS, null)
+            }
+
+            override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
+                val url = request?.url.toString()
+                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
+                startActivity(intent) // Opens external links in the browser
+                return true // Prevents WebView from handling it
+            }
+        }
 
         // Add listener for permissions, so we can dispatch the Camera Permissions check to Android
         webView.webChromeClient = object : WebChromeClient() {
@@ -110,6 +138,31 @@ class IntelliWebViewActivity : AppCompatActivity() {
                         }
                     }
                 }
+            }
+
+            override fun onCreateWindow(
+                view: WebView?,
+                isDialog: Boolean,
+                isUserGesture: Boolean,
+                resultMsg: Message?
+            ): Boolean {
+                val newWebView = WebView(this@IntelliWebViewActivity)
+                newWebView.settings.javaScriptEnabled = true
+
+                newWebView.webViewClient = object : WebViewClient() {
+                    override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
+                        val url = request?.url.toString()
+                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
+                        startActivity(intent) // Opens in external browser
+                        return true
+                    }
+                }
+
+                val transport = resultMsg?.obj as? WebView.WebViewTransport
+                transport?.webView = newWebView
+                resultMsg?.sendToTarget()
+
+                return true
             }
         }
 
@@ -158,31 +211,5 @@ private class IntelliWebAppInterface(val webViewActivity: IntelliWebViewActivity
         } catch (e: Exception) {
             null
         }
-    }
-}
-
-private class IntelliWebViewClient : WebViewClient() {
-    override fun onPageFinished(view: WebView?, url: String?) {
-        super.onPageFinished(view, url)
-        Log.d("WebView", "Page finished loading: $url")
-
-        // Disable zoom
-        val disableZoomJS = """
-            var meta = document.createElement('meta');
-            meta.name = 'viewport';
-            meta.content = 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no';
-            var head = document.getElementsByTagName('head')[0];
-            head.appendChild(meta);
-        """.trimIndent()
-        view?.evaluateJavascript(disableZoomJS, null)
-
-        // Patch PostMessage API
-        val postMessageJS = """
-            window.postMessage = function(data) {
-                var jsonString = JSON.stringify(data)
-                window.IntelliPostMessage.receivePostMessage(jsonString);
-            };
-        """.trimIndent()
-        view?.evaluateJavascript(postMessageJS, null)
     }
 }
