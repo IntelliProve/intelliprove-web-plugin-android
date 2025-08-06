@@ -198,6 +198,7 @@ private class IntelliWebAppInterface(val webViewActivity: IntelliWebViewActivity
 
         val stage = stageFromJson(postMessage)
         if (stage == "dismiss") {
+            IntelliWebViewDelegateHolder.delegate?.didReceivePostMessage(postMessage)
             webViewActivity.finish()
         } else {
             IntelliWebViewDelegateHolder.delegate?.didReceivePostMessage(postMessage)
