@@ -86,8 +86,7 @@ class IntelliWebViewActivity : AppCompatActivity() {
         webView.webViewClient = object : WebViewClient() {
             override fun onPageFinished(view: WebView?, url: String?) {
                 super.onPageFinished(view, url)
-                Log.d("WebView", "Page finished loading: $url")
-
+                Log.d("WebView", "Page finished loading")
                 // Disable zoom
                 val disableZoomJS = """
                     var meta = document.createElement('meta');
