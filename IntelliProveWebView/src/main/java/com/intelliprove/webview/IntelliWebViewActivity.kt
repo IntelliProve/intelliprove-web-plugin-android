@@ -51,6 +51,20 @@ class IntelliWebViewActivity : AppCompatActivity() {
         super.onDestroy()
     }
 
+    override fun onPause() {
+        super.onPause()
+        webView.onPause() // Pauses JS timers
+        webView.evaluateJavascript("window.dispatchEvent(new Event('appPaused'));", null)
+        Log.d("WebViewActivity", "onPause triggered")
+    }
+
+    override fun onResume() {
+        super.onResume()
+        webView.onResume()
+        webView.evaluateJavascript("window.dispatchEvent(new Event('appResumed'));", null)
+        Log.d("WebViewActivity", "onResume triggered")
+    }
+
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -76,21 +90,21 @@ class IntelliWebViewActivity : AppCompatActivity() {
 
                 // Disable zoom
                 val disableZoomJS = """
-            var meta = document.createElement('meta');
-            meta.name = 'viewport';
-            meta.content = 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no';
-            var head = document.getElementsByTagName('head')[0];
-            head.appendChild(meta);
-        """.trimIndent()
+                    var meta = document.createElement('meta');
+                    meta.name = 'viewport';
+                    meta.content = 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no';
+                    var head = document.getElementsByTagName('head')[0];
+                    head.appendChild(meta);
+                """.trimIndent()
                 view?.evaluateJavascript(disableZoomJS, null)
 
                 // Patch PostMessage API
                 val postMessageJS = """
-            window.postMessage = function(data) {
-                var jsonString = JSON.stringify(data)
-                window.IntelliPostMessage.receivePostMessage(jsonString);
-            };
-        """.trimIndent()
+                    window.postMessage = function(data) {
+                        var jsonString = JSON.stringify(data)
+                        window.IntelliPostMessage.receivePostMessage(jsonString);
+                    };
+                """.trimIndent()
                 view?.evaluateJavascript(postMessageJS, null)
             }
 
