@@ -109,9 +109,16 @@ class IntelliWebViewActivity : AppCompatActivity() {
 
             override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
                 val url = request?.url.toString()
+
+                // Allow the WebView to handle reloads and same-origin URLs
+                if (Uri.parse(url).host == Uri.parse(view?.url).host) {
+                    return false // Let WebView load it
+                }
+
+                // Otherwise, open external links in browser
                 val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
-                startActivity(intent) // Opens external links in the browser
-                return true // Prevents WebView from handling it
+                startActivity(intent)
+                return true
             }
         }
 
