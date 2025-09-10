@@ -60,8 +60,8 @@ class IntelliWebViewActivity : AppCompatActivity() {
         val urlString = intent.getStringExtra(urlStringKey)
         this.webView = findViewById<WebView>(R.id.webView)
 
-        // Ensure text zoom is never higher than 120%
-        webView.settings.textZoom = minOf(webView.settings.textZoom, 120)
+        // Ensure text zoom is never higher than 115%
+        webView.settings.textZoom = minOf(webView.settings.textZoom, 115)
 
         // Needed to run JavaScript and use the LocalStorage API - otherwise the web app won't work
         webView.settings.javaScriptEnabled = true
