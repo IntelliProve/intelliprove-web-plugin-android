@@ -51,6 +51,20 @@ class IntelliWebViewActivity : AppCompatActivity() {
         super.onDestroy()
     }
 
+    override fun onPause() {
+        super.onPause()
+        webView.onPause() // Pauses JS timers
+        webView.evaluateJavascript("window.dispatchEvent(new Event('appPaused'));", null)
+        Log.d("WebViewActivity", "onPause triggered")
+    }
+
+    override fun onResume() {
+        super.onResume()
+        webView.onResume()
+        webView.evaluateJavascript("window.dispatchEvent(new Event('appResumed'));", null)
+        Log.d("WebViewActivity", "onResume triggered")
+    }
+
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -75,33 +89,39 @@ class IntelliWebViewActivity : AppCompatActivity() {
         webView.webViewClient = object : WebViewClient() {
             override fun onPageFinished(view: WebView?, url: String?) {
                 super.onPageFinished(view, url)
-                Log.d("WebView", "Page finished loading: $url")
-
+                Log.d("WebView", "Page finished loading")
                 // Disable zoom
                 val disableZoomJS = """
-            var meta = document.createElement('meta');
-            meta.name = 'viewport';
-            meta.content = 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no';
-            var head = document.getElementsByTagName('head')[0];
-            head.appendChild(meta);
-        """.trimIndent()
+                    var meta = document.createElement('meta');
+                    meta.name = 'viewport';
+                    meta.content = 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no';
+                    var head = document.getElementsByTagName('head')[0];
+                    head.appendChild(meta);
+                """.trimIndent()
                 view?.evaluateJavascript(disableZoomJS, null)
 
                 // Patch PostMessage API
                 val postMessageJS = """
-            window.postMessage = function(data) {
-                var jsonString = JSON.stringify(data)
-                window.IntelliPostMessage.receivePostMessage(jsonString);
-            };
-        """.trimIndent()
+                    window.postMessage = function(data) {
+                        var jsonString = JSON.stringify(data)
+                        window.IntelliPostMessage.receivePostMessage(jsonString);
+                    };
+                """.trimIndent()
                 view?.evaluateJavascript(postMessageJS, null)
             }
 
             override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
                 val url = request?.url.toString()
+
+                // Allow the WebView to handle reloads and same-origin URLs
+                if (Uri.parse(url).host == Uri.parse(view?.url).host) {
+                    return false // Let WebView load it
+                }
+
+                // Otherwise, open external links in browser
                 val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
-                startActivity(intent) // Opens external links in the browser
-                return true // Prevents WebView from handling it
+                startActivity(intent)
+                return true
             }
         }
 
