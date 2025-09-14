@@ -3,15 +3,19 @@ plugins {
     id("org.jetbrains.kotlin.android")
 }
 
+val sdkVersion = "1.1.1" // 👈 SDK version
+
 android {
     namespace = "com.intelliprove.webview"
-    compileSdk = 34
+    compileSdk = 35
 
     defaultConfig {
         minSdk = 24
+        version = sdkVersion
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         consumerProguardFiles("consumer-rules.pro")
+
     }
 
     buildTypes {
@@ -23,12 +27,22 @@ android {
             )
         }
     }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_1_8
         targetCompatibility = JavaVersion.VERSION_1_8
     }
+
     kotlinOptions {
         jvmTarget = "1.8"
+    }
+
+    // Change output .aar filename
+    libraryVariants.all {
+        outputs.all {
+            val variantOutput = this as com.android.build.gradle.internal.api.LibraryVariantOutputImpl
+            variantOutput.outputFileName = "intelliprove-webview-sdk-$sdkVersion-${name}.aar"
+        }
     }
 }
 
