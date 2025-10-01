@@ -4,6 +4,7 @@ import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
 import android.util.Log
 import android.widget.Button
+import android.widget.EditText
 import com.intelliprove.webview.IntelliWebViewActivity
 import com.intelliprove.webview.IntelliWebViewDelegate
 
@@ -12,16 +13,23 @@ class MainActivity : AppCompatActivity(), IntelliWebViewDelegate {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
+        val urlEditText = findViewById<EditText>(R.id.editTextText2)
         val openWebViewButton = findViewById<Button>(R.id.openWebViewButton)
+
         openWebViewButton.setOnClickListener {
-            openWebView()
+            val url = urlEditText.text.toString().trim()
+            if (url.isNotEmpty()) {
+                openWebView(url)
+            } else {
+                Log.e("MainActivity", "URL is empty")
+            }
         }
     }
 
-    private fun openWebView() {
+    private fun openWebView(url: String) {
         IntelliWebViewActivity.start(
             this,
-            "https://plugin-streaming-dev.intelliprove.com/?action_token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyIjp7ImVtYWlsIjoiIiwiY3VzdG9tZXIiOiJERU1PLUNVU1RPTUVSLTEiLCJncm91cCI6ImFkbWluIiwibWF4X21lYXN1cmVtZW50X2NvdW50IjotMX0sIm1ldGEiOnt9LCJleHAiOjE3MTQ5MDcyMDV9.7GRRK8zIs4Q_LJ_pDSBVljd6O4K2shfMBxZCmn4UOlM",
+            url,
             this
         )
     }
