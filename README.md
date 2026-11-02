@@ -54,3 +54,7 @@ When building the SDK, always verify that the Build Variants are set to "Release
 
 ## Running the test app
 Set the Build Variants to Debug to fix issues concerning signing of the app.
+## Testing on an emulator
+To check the scan screen survives Android killing its WebView (the low-memory crash), type `chrome://kill` into the test app's URL field and press the button. Pass: the log shows `Render process gone (crashed: false)` and a `dismiss` message under `MainActivity`, `adb shell pidof com.intelliprove` returns the same id before and after, and the log has no `killing application` line. `chrome://crash` tests a renderer crash the same way.
+
+For the full procedure, including a Cordova host app, see [Testing on an emulator](https://github.com/IntelliProve/intelliprove-web-plugin-cordova/blob/main/docs/emulator-testing.md) in the Cordova plugin repo.
