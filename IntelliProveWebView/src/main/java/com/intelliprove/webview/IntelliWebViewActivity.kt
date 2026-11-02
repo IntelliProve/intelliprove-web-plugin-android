@@ -6,10 +6,13 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import android.os.Message
 import android.util.Log
+import android.view.ViewGroup
 import android.webkit.*
+import androidx.annotation.RequiresApi
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
@@ -28,6 +31,8 @@ class IntelliWebViewActivity : AppCompatActivity() {
     private var pendingPermissionRequest: PermissionRequest? = null
 
     private lateinit var webView: WebView;
+    // Set once Android has killed the WebView's renderer: the instance is dead from then on
+    private var rendererGone = false
 
     companion object {
         private const val urlStringKey = "urlStringKey"
@@ -47,12 +52,13 @@ class IntelliWebViewActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         IntelliWebViewDelegateHolder.delegate = null
-        this.webView.destroy()
+        if (!rendererGone) this.webView.destroy()
         super.onDestroy()
     }
 
     override fun onPause() {
         super.onPause()
+        if (rendererGone) return
         webView.onPause() // Pauses JS timers
         webView.evaluateJavascript("window.dispatchEvent(new Event('appPaused'));", null)
         Log.d("WebViewActivity", "onPause triggered")
@@ -60,6 +66,7 @@ class IntelliWebViewActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
+        if (rendererGone) return
         webView.onResume()
         webView.evaluateJavascript("window.dispatchEvent(new Event('appResumed'));", null)
         Log.d("WebViewActivity", "onResume triggered")
@@ -121,6 +128,22 @@ class IntelliWebViewActivity : AppCompatActivity() {
                 // Otherwise, open external links in browser
                 val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
                 startActivity(intent)
+                return true
+            }
+
+            // Android kills the renderer under memory pressure (or it crashes). Unless every
+            // WebView handles this, Chromium kills the whole host app, so close the scan instead
+            // and tell the host the same way the web app does when the user closes it.
+            @RequiresApi(Build.VERSION_CODES.O) // Android only calls this from 8.0 (API 26) on
+            override fun onRenderProcessGone(view: WebView?, detail: RenderProcessGoneDetail?): Boolean {
+                Log.e("WebView", "Render process gone (crashed: ${detail?.didCrash()})")
+                rendererGone = true
+                (view?.parent as? ViewGroup)?.removeView(view)
+                view?.destroy()
+                IntelliWebViewDelegateHolder.delegate?.didReceivePostMessage(
+                    """{"stage":"dismiss","data":{"hasResults":false}}"""
+                )
+                finish()
                 return true
             }
         }
