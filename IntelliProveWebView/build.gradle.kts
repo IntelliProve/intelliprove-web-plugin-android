@@ -3,7 +3,7 @@ plugins {
     id("org.jetbrains.kotlin.android")
 }
 
-val sdkVersion = "1.1.1" // 👈 SDK version
+val sdkVersion = "1.1.2" // 👈 SDK version
 
 android {
     namespace = "com.intelliprove.webview"
