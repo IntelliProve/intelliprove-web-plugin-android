@@ -6,10 +6,13 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import android.os.Message
 import android.util.Log
+import android.view.ViewGroup
 import android.webkit.*
+import androidx.annotation.RequiresApi
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
@@ -28,6 +31,10 @@ class IntelliWebViewActivity : AppCompatActivity() {
     private var pendingPermissionRequest: PermissionRequest? = null
 
     private lateinit var webView: WebView;
+    // Set once Android has killed the WebView's renderer: the instance is dead from then on
+    private var rendererGone = false
+    // Last scan uuid the web app reported, so a dismiss we send on its behalf carries it too
+    @Volatile var lastScanUuid: String? = null
 
     companion object {
         private const val urlStringKey = "urlStringKey"
@@ -47,12 +54,13 @@ class IntelliWebViewActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         IntelliWebViewDelegateHolder.delegate = null
-        this.webView.destroy()
+        if (!rendererGone) this.webView.destroy()
         super.onDestroy()
     }
 
     override fun onPause() {
         super.onPause()
+        if (rendererGone) return
         webView.onPause() // Pauses JS timers
         webView.evaluateJavascript("window.dispatchEvent(new Event('appPaused'));", null)
         Log.d("WebViewActivity", "onPause triggered")
@@ -60,6 +68,7 @@ class IntelliWebViewActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
+        if (rendererGone) return
         webView.onResume()
         webView.evaluateJavascript("window.dispatchEvent(new Event('appResumed'));", null)
         Log.d("WebViewActivity", "onResume triggered")
@@ -123,6 +132,24 @@ class IntelliWebViewActivity : AppCompatActivity() {
                 startActivity(intent)
                 return true
             }
+
+            // Android kills the renderer under memory pressure (or it crashes). Unless every
+            // WebView handles this, Chromium kills the whole host app, so close the scan instead
+            // and tell the host the same way the web app does when the user closes it.
+            @RequiresApi(Build.VERSION_CODES.O) // Android only calls this from 8.0 (API 26) on
+            override fun onRenderProcessGone(view: WebView?, detail: RenderProcessGoneDetail?): Boolean {
+                Log.e("WebView", "Render process gone (crashed: ${detail?.didCrash()})")
+                rendererGone = true
+                (view?.parent as? ViewGroup)?.removeView(view)
+                view?.destroy()
+                val dismiss = JSONObject()
+                    .put("stage", "dismiss")
+                    .put("uuid", lastScanUuid)
+                    .put("data", JSONObject().put("hasResults", false))
+                IntelliWebViewDelegateHolder.delegate?.didReceivePostMessage(dismiss.toString())
+                finish()
+                return true
+            }
         }
 
         // Add listener for permissions, so we can dispatch the Camera Permissions check to Android
@@ -179,6 +206,13 @@ class IntelliWebViewActivity : AppCompatActivity() {
                         startActivity(intent) // Opens in external browser
                         return true
                     }
+
+                    // Shares the main WebView's renderer, so it must handle the kill too or the app dies
+                    @RequiresApi(Build.VERSION_CODES.O)
+                    override fun onRenderProcessGone(view: WebView?, detail: RenderProcessGoneDetail?): Boolean {
+                        view?.destroy()
+                        return true
+                    }
                 }
 
                 val transport = resultMsg?.obj as? WebView.WebViewTransport
@@ -218,6 +252,7 @@ private class IntelliWebAppInterface(val webViewActivity: IntelliWebViewActivity
     @JavascriptInterface
     fun receivePostMessage(postMessage: String) {
         Log.d("PostMessage", postMessage)
+        uuidFromJson(postMessage)?.let { webViewActivity.lastScanUuid = it }
 
         val stage = stageFromJson(postMessage)
         if (stage == "dismiss") {
@@ -225,6 +260,14 @@ private class IntelliWebAppInterface(val webViewActivity: IntelliWebViewActivity
             webViewActivity.finish()
         } else {
             IntelliWebViewDelegateHolder.delegate?.didReceivePostMessage(postMessage)
+        }
+    }
+
+    private fun uuidFromJson(jsonString: String): String? {
+        return try {
+            JSONObject(jsonString).optString("uuid").ifEmpty { null }
+        } catch (e: Exception) {
+            null
         }
     }
 
